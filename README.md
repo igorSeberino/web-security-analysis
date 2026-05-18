@@ -1,139 +1,268 @@
-# Sistema de Ocorrências Acadêmicas — Versão Endurecida (Entrega Final AP01)
+<div align="center">
 
-Atividade Prática 01 — Segurança da Informação
-Centro Universitário Católica de Santa Catarina
-Prof. Edson Vaz Lopes
+# Web Security Analysis
 
-**Integrantes do grupo:** Renato Colin Neto, Adrian Cesar, Gabriel Carvalho e Igor Thiago Seberino.
+### Análise e endurecimento de vulnerabilidades em aplicação web front-end
 
----
+Protótipo didático de Sistema de Ocorrências Acadêmicas no qual foram identificadas 17+ vulnerabilidades de segurança e aplicados controles compensatórios para tornar o sistema utilizável dentro das restrições arquiteturais (HTML/CSS/JS puro, sem back-end).
 
-## 1. O que é este projeto
+<br/>
 
-Versão **endurecida** (final) do protótipo "Sistema de Ocorrências Acadêmicas". O sistema continua sendo
-um aplicativo *front-end puro* (HTML/CSS/JS + `localStorage`), conforme exigência da disciplina, mas
-recebeu um conjunto de controles compensatórios suficientes para que possa ser **utilizado em laboratório**
-sem expor credenciais, sem permitir escalonamento trivial de privilégios e sem armazenar dados sensíveis
-fora de seu escopo de exibição.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
+![Status](https://img.shields.io/badge/status-completed-success)
+![No dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 
-> **Não usar com dados reais.** Como o sistema não tem back-end, toda a lógica é inspeccionável e
-> alterável via DevTools. Esta versão **reduz** o risco, mas não o **elimina**.
+[**Acessar demo ao vivo**](https://igorSeberino.github.io/web-security-analysis/) · [**Ler relatório técnico (PDF)**](./relatorio-tecnico-final.pdf) · [Reportar problema](https://github.com/igorSeberino/web-security-analysis/issues)
 
----
-
-## 2. Como executar
-
-### Opção A — Localmente
-
-1. Clone o repositório.
-2. Abra `index.html` em um navegador moderno (Chrome, Edge, Firefox).
-3. Faça login com qualquer um dos usuários de demonstração (ver seção 4).
-
-### Opção B — GitHub Pages
-
-1. Acesse `https://<usuario-github>.github.io/<nome-do-repositorio>/`.
-2. Mesma tela de login.
+</div>
 
 ---
 
-## 3. Estrutura
+## Sumário
+
+- [Contexto](#contexto)
+- [Demonstração](#demonstração)
+- [Vulnerabilidades identificadas e correções aplicadas](#vulnerabilidades-identificadas-e-correções-aplicadas)
+- [Arquitetura e stack](#arquitetura-e-stack)
+- [Como executar localmente](#como-executar-localmente)
+- [Estrutura do repositório](#estrutura-do-repositório)
+- [Limitações conhecidas](#limitações-conhecidas)
+- [Conceitos aplicados](#conceitos-aplicados)
+- [Contexto acadêmico](#contexto-acadêmico)
+- [Autores](#autores)
+- [Licença](#licença)
+
+---
+
+## Contexto
+
+Este repositório documenta a análise técnica de um protótipo deliberadamente vulnerável e a implementação de melhorias de segurança que pudessem ser feitas **exclusivamente no front-end**, sem introduzir back-end.
+
+O exercício serve para demonstrar, de forma prática, **quais defesas o front-end consegue oferecer** (sanitização, mascaramento, RBAC simulado, validações, timeout de sessão, throttling, CSP via meta-tag) e **onde exatamente a arquitetura cliente-servidor se torna indispensável** (autenticação real, integridade de logs, controle de privilégios não-burlável, persistência segura).
+
+> **Aviso:** este sistema é um protótipo acadêmico. Toda a lógica executa no navegador e pode ser inspecionada via DevTools. **Não deve operar com dados pessoais reais.**
+
+---
+
+## Demonstração
+
+**Live demo:** [https://igorSeberino.github.io/web-security-analysis/](https://igorSeberino.github.io/web-security-analysis/)
+
+**Credenciais de teste:**
+
+| Perfil | E-mail | Senha |
+| ------ | ------ | ----- |
+| Aluno | `aluno@faculdade.local` | `Aluno@2026` |
+| Professor | `professor@faculdade.local` | `Prof@2026` |
+| Administrador | `admin@faculdade.local` | `Admin@2026` |
+
+> As senhas no código-fonte estão armazenadas como **hash SHA-256**, não em texto puro.
+
+---
+
+## Vulnerabilidades identificadas e correções aplicadas
+
+### Visão geral
+
+| # | Vulnerabilidade | Severidade | Status |
+|---|---|---|---|
+| 1 | Senhas em texto puro no código-fonte | 🔴 Crítica | ✅ Corrigida (SHA-256) |
+| 2 | Token "secreto" exposto no front-end | 🔴 Crítica | ✅ Removida |
+| 3 | Credenciais pré-preenchidas nos inputs do HTML | 🔴 Crítica | ✅ Corrigida |
+| 4 | Lista pública de usuários/senhas na tela de login | 🔴 Crítica | ✅ Colapsada em `<details>` |
+| 5 | Senha persistida em `localStorage` após login | 🔴 Crítica | ✅ Corrigida (sessão sem credenciais) |
+| 6 | Escalonamento trivial de privilégios via seletor de perfil | 🔴 Crítica | ✅ Corrigida (RBAC + restrição ADMIN) |
+| 7 | Ausência de controle de autorização nos handlers | 🟠 Alta | ✅ Corrigida (mapa `PERMISSIONS`) |
+| 8 | XSS via `innerHTML` sem escape | 🟠 Alta | ✅ Corrigida (`escapeHTML` + CSP) |
+| 9 | `onclick` inline com IDs concatenados | 🟠 Alta | ✅ Corrigida (event delegation) |
+| 10 | Sem proteção contra brute-force | 🟠 Alta | ✅ Throttling (5 tentativas → 5 min) |
+| 11 | Dados pessoais visíveis a todos os perfis | 🟠 Alta | ✅ Mascaramento + revelação por permissão |
+| 12 | Observação interna visível a alunos | 🟡 Média | ✅ Restrita por perfil |
+| 13 | Sem timeout de sessão | 🟡 Média | ✅ 10 min de inatividade |
+| 14 | Sem validação de formulário | 🟡 Média | ✅ Validações + LGPD opt-in |
+| 15 | Logs persistindo PII completa | 🟡 Média | ✅ Truncados + retenção 500 entries |
+| 16 | Busca varrendo CPF e observação interna | 🟡 Média | ✅ Escopo reduzido |
+| 17 | Exportação incluía USERS + token + localStorage cru | 🔴 Crítica | ✅ Filtrada por perfil |
+| 18 | Sem cabeçalhos defensivos | 🟢 Baixa | ✅ CSP via meta + noindex + no-referrer |
+| 19 | Coleta indiscriminada de PII (LGPD) | 🟡 Média | ✅ Minimização (fieldset condicional) |
+
+### Antes vs. depois (exemplos de código)
+
+**Senhas:**
+
+```diff
+- password: "123456"
+- password: "admin"
++ passwordHash: "62d1cc9bf2bbd4a9270b754bff21fe9f44c7b255f938a6630689102666f3aa19" // SHA-256
+```
+
+**Sessão:**
+
+```diff
+- saveSession(user)  // salvava { ..., password: "123456" } no localStorage
++ saveSession(user)  // monta objeto seguro sem credenciais:
++ // { id, name, email, role, classes, loggedAt }
+```
+
+**RBAC:**
+
+```diff
+- function deleteOccurrence(id) {
+-   // qualquer usuário podia chamar
+- }
++ function deleteOccurrence(id) {
++   if (!requirePermission('delete', `delete ${id}`)) return;
++   if (!confirm('Deseja realmente excluir...?')) return;
++   // ...
++ }
+```
+
+**Renderização sem XSS:**
+
+```diff
+- innerHTML = `<button onclick="deleteOccurrence('${item.id}')">Excluir</button>`
++ innerHTML = `<button data-act="delete" data-id="${escapeHTML(item.id)}">Excluir</button>`
++ // + event delegation no listener da tabela
+```
+
+---
+
+## Arquitetura e stack
+
+### Stack
+
+- **HTML5** — marcação semântica + Content-Security-Policy via meta-tag
+- **CSS3** — design system com variáveis CSS, layout responsivo
+- **JavaScript (ES2020)** — `async/await`, Web Crypto API (`crypto.subtle.digest`), event delegation
+- **localStorage** — persistência client-side (com escopo controlado)
+- **Sem dependências externas** — zero `npm install`
+
+### Camadas de defesa
 
 ```
-/
-├── index.html      Marcação principal + CSP via meta-tag + aviso de protótipo
-├── style.css       Estilo (base + acréscimos da versão final)
-├── app.js          Lógica do sistema (RBAC, hash de senhas, sessão, auditoria)
-└── README.md       Este arquivo
+┌─────────────────────────────────────────────────────────────┐
+│  Camada 1 — Defesa declarativa                              │
+│  CSP via meta · referrer no-referrer · robots noindex       │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Camada 2 — Autenticação                                    │
+│  Hash SHA-256 (Web Crypto) · throttling · msgs genéricas    │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Camada 3 — Autorização (RBAC)                              │
+│  PERMISSIONS · hasPermission() · requirePermission()        │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Camada 4 — Entrada e saída                                 │
+│  sanitizeInput() · escapeHTML() · validações · mascaramento │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Camada 5 — Sessão                                          │
+│  Timeout 10 min · sem credenciais persistidas               │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Camada 6 — Auditoria                                       │
+│  Logs estruturados · retenção limitada · truncamento        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Usuários de demonstração
+## Como executar localmente
 
-| E-mail                          | Senha       | Perfil       |
-| ------------------------------- | ----------- | ------------ |
-| `aluno@faculdade.local`         | `Aluno@2026` | ALUNO        |
-| `professor@faculdade.local`     | `Prof@2026`  | PROFESSOR    |
-| `admin@faculdade.local`         | `Admin@2026` | ADMIN        |
+### Opção 1 — Abrir direto no navegador
 
-As senhas **não** estão armazenadas em texto puro no código-fonte. O que está no `app.js` é o
-**hash SHA-256** de cada senha. Em produção, o hash deveria ocorrer no servidor com `bcrypt` ou
-`Argon2` + salt único por usuário.
+```bash
+git clone https://github.com/igorSeberino/web-security-analysis.git
+cd web-security-analysis
+# Abra index.html no navegador (Chrome, Edge, Firefox)
+```
 
----
+### Opção 2 — Servidor HTTP local (recomendado para CSP)
 
-## 5. Controles implementados
+```bash
+# Python 3
+python3 -m http.server 8000
 
-Esta versão consolida o trabalho da entrega parcial e adiciona as correções necessárias para tornar
-o sistema utilizável em laboratório:
+# Node.js
+npx serve .
 
-### Da entrega parcial (já presentes)
-
-- **RBAC** via mapa `PERMISSIONS` (ALUNO / PROFESSOR / ADMIN) consultado por `hasPermission()` e
-  `requirePermission()` em cada handler crítico.
-- **Restrição de exclusão** (`deleteOccurrence`) — somente ADMIN.
-- **Restrição de troca de perfil** (`changeRole`) — somente ADMIN.
-- **Restrição de operações destrutivas** (`clearLogs`, `resetData`) — somente ADMIN.
-- **Mascaramento de PII** (`maskCPF`, `maskPhone`, `maskEmail`) na tabela para perfis não-administrativos.
-- **Sanitização e escape** (`escapeHTML`, `sanitizeInput`) para mitigar XSS.
-- **Timeout de sessão** (10 min de inatividade) com eventos de atividade monitorados.
-- **Validações de formulário** (nome, matrícula, CPF, e-mail, telefone, descrição, aceite LGPD).
-- **Confirmações** (`confirm()`) em ações destrutivas.
-- **Logs expandidos** com perfil, ação, detalhe e timestamp.
-- **Feedback visual** via `showMessage()` em vez de `alert()` puro.
-
-### Acrescentados nesta versão final
-
-- **Hash SHA-256 das senhas** via Web Crypto API. O código-fonte não contém mais nenhuma senha em texto puro.
-- **Remoção do `FAKE_API_TOKEN`** que estava exposto no front-end.
-- **Tela de login limpa** — sem credenciais pré-preenchidas nos inputs; lista de usuários de demonstração
-  movida para um bloco `<details>` colapsado, fora do fluxo principal.
-- **Sessão sem credenciais** — `saveSession()` agora salva apenas dados de exibição
-  (id, name, email, role, classes, timestamp). Nada de hash, senha ou token vai para o `localStorage`.
-- **Throttling de login** — 5 tentativas falhas bloqueiam o login por 5 minutos. Mensagem de erro
-  genérica ("Credenciais inválidas") para evitar enumeração de usuários.
-- **Eliminação de `onclick` inline** — botões da tabela usam `data-act`/`data-id` + delegação de evento.
-- **Busca filtrada** — agora pesquisa apenas em nome, matrícula, tipo, prioridade e status.
-  Não percorre mais CPF, e-mail, telefone ou observação interna.
-- **Logs com retenção limitada** — máximo de 500 entradas, detalhes truncados em 240 caracteres.
-- **Exportação por perfil** — ADMIN exporta ocorrências + logs; PROFESSOR exporta apenas ocorrências;
-  ALUNO não exporta. **Nunca** exporta `USERS` nem hashes.
-- **CSP via `meta`** — restringe origem de scripts e estilos.
-- **Aviso permanente de protótipo** — banner topo da página.
-- **Robots noindex / referrer no-referrer** — reduz exposição em buscadores.
-- **Fieldset condicional** — CPF, e-mail e telefone só aparecem em "Solicitação administrativa"
-  (minimização de coleta — LGPD).
-- **CPFs e contatos iniciais notoriamente fictícios** (`000.000.000-0X`).
+# Acesse http://localhost:8000
+```
 
 ---
 
-## 6. Limitações remanescentes (não resolvíveis sem back-end)
+## Estrutura do repositório
 
-| Limitação | Por que persiste |
-| --- | --- |
-| Senhas (mesmo como hash) inspecionáveis no código-fonte | Sem servidor, qualquer um lê o `app.js` |
-| RBAC contornável por DevTools | Usuário pode editar `PERMISSIONS` no console |
-| `localStorage` manipulável | Qualquer usuário pode adicionar/remover registros via console |
-| Sessão sem assinatura criptográfica | Sem servidor para emitir e validar JWT |
-| Logs locais sem garantia de integridade | Podem ser apagados; sem `WORM` |
-| Sem rate limit real | Throttling de login é apenas best-effort no cliente |
-
-Essas limitações são **estruturais** e a única forma adequada de resolvê-las é a introdução de um
-back-end real. O relatório técnico discute em detalhes o que isso exigiria.
+```
+web-security-analysis/
+├── index.html                       # Estrutura + CSP + banner de protótipo
+├── style.css                        # Design system e layout
+├── app.js                           # Lógica completa (RBAC, sessão, auditoria)
+├── README.md                        # Este arquivo
+├── relatorio-tecnico-final.pdf      # Relatório técnico completo (13 páginas)
+└── LICENSE                          # MIT
+```
 
 ---
 
-## 7. Como publicar no GitHub Pages
+## Limitações conhecidas
 
-1. Crie um repositório novo no GitHub (ex.: `seguranca-da-informacao-AP01-final`).
-2. Adicione `index.html`, `style.css`, `app.js`, `README.md` e `LICENSE` ao repositório.
-3. Vá em **Settings → Pages**.
-4. Em **Source**, escolha branch `main` e diretório `/ (root)`.
-5. Aguarde alguns minutos. O sistema ficará disponível em
-   `https://<usuario>.github.io/<repositorio>/`.
+O sistema é estritamente front-end. As limitações abaixo são **estruturais** — não podem ser resolvidas sem introduzir back-end:
+
+| Limitação | Por que persiste | Solução em produção |
+|---|---|---|
+| Hashes inspecionáveis no código | Qualquer usuário lê o `app.js` | Hash no servidor (bcrypt/Argon2 + salt) |
+| RBAC contornável via DevTools | Usuário edita `PERMISSIONS` no console | Autorização exclusivamente no servidor |
+| Sessão sem assinatura | Sem servidor para emitir JWT | JWT + cookie HttpOnly + Secure + SameSite |
+| Throttling burlável | Estado vive no `localStorage` | Rate limit server-side + CAPTCHA |
+| Logs locais sem integridade | Podem ser apagados pelo usuário | SIEM centralizado (Elastic, Splunk) |
+
+O **relatório técnico** detalha um plano de evolução em três fases para uma versão produtiva.
 
 ---
 
-## 8. Licença
+## Conceitos aplicados
 
-MIT — ver `LICENSE`.
+- **Defesa em profundidade** — múltiplas camadas de proteção independentes
+- **Menor privilégio** — cada perfil recebe apenas o necessário
+- **Auditoria** — toda ação sensível gera log
+- **Minimização de dados (LGPD)** — coleta condicional de PII
+- **Falha segura** — em caso de erro, sistema nega por padrão
+- **Sanitização e escape** — toda entrada/saída tratada
+- **Expiração de sessão** — redução de janela de exposição
+- **Segregação por função** — ALUNO ≠ PROFESSOR ≠ ADMIN
+
+---
+
+## Contexto acadêmico
+
+Trabalho desenvolvido para a disciplina **Segurança da Informação** do curso de **Engenharia de Software** do Centro Universitário Católica de Santa Catarina, sob orientação do Prof. Edson Vaz Lopes (Atividade Prática 01, 2026).
+
+A proposta da atividade era analisar um protótipo deliberadamente vulnerável e aplicar melhorias dentro da restrição de não introduzir back-end — exercitando o discernimento sobre quais riscos são mitigáveis no cliente e quais exigem arquitetura de servidor.
+
+---
+
+## Autores
+
+- **Renato Colin Neto**
+- **Adrian Cesar**
+- **Gabriel Carvalho**
+- **Igor Thiago Seberino** — [@igorSeberino](https://github.com/igorSeberino)
+
+---
+
+## Licença
+
+Distribuído sob a licença MIT. Veja [`LICENSE`](./LICENSE) para mais informações.
+
+---
+
+<div align="center">
+
+Se este projeto te ajudou de alguma forma, considere dar uma ⭐!
+
+</div>
